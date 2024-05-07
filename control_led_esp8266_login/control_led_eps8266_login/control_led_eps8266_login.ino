@@ -1,9 +1,8 @@
-// Load Wi-Fi library
 #include <ESP8266WiFi.h>
 
 // Replace with your network credentials
-const char* ssid     = "nama wifi";
-const char* password = "pass wifi";
+const char* ssid = "nama wifi";
+const char* wifiPassword = "pass wifi";
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -22,9 +21,37 @@ const int output4 = 4;
 // Current time
 unsigned long currentTime = millis();
 // Previous time
-unsigned long previousTime = 0; 
+unsigned long previousTime = 0;
 // Define timeout time in milliseconds (example: 2000ms = 2s)
 const long timeoutTime = 2000;
+
+// Define login credentials
+const char* loginUsername = "admin";
+const char* loginPassword = "admin123";
+
+// Flag to track if user is authenticated
+bool isAuthenticated = false;
+
+void handleLogin(WiFiClient client) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-type:text/html");
+  client.println("Connection: close");
+  client.println();
+  client.println("<!DOCTYPE html><html><head><title>Login</title></head><body>");
+  client.println("<h2>Login</h2>");
+  client.println("<form action='/login' method='POST'>");
+  client.println("Username: <input type='text' name='username'><br>");
+  client.println("Password: <input type='password' name='password'><br>");
+  client.println("<input type='submit' value='Login'>");
+  client.println("</form>");
+  client.println("</body></html>");
+}
+
+void handleLoginPost(String payload) {
+  if (payload.indexOf("username=admin&password=admin123") != -1) {
+    isAuthenticated = true;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -38,7 +65,7 @@ void setup() {
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, wifiPassword);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -51,7 +78,7 @@ void setup() {
   server.begin();
 }
 
-void loop(){
+void loop() {
   WiFiClient client = server.available();   // Listen for incoming clients
 
   if (client) {                             // If a new client connects,
@@ -60,7 +87,7 @@ void loop(){
     currentTime = millis();
     previousTime = currentTime;
     while (client.connected() && currentTime - previousTime <= timeoutTime) { // loop while the client's connected
-      currentTime = millis();         
+      currentTime = millis();
       if (client.available()) {             // if there's bytes to read from the client,
         char c = client.read();             // read a byte, then
         Serial.write(c);                    // print it out the serial monitor
@@ -69,13 +96,21 @@ void loop(){
           // if the current line is blank, you got two newline characters in a row.
           // that's the end of the client HTTP request, so send a response:
           if (currentLine.length() == 0) {
+            if (header.indexOf("POST /login") >= 0) {
+              handleLoginPost(header);
+            }
+            // Check if user is authenticated before processing requests
+            if (!isAuthenticated && header.indexOf("GET /login") == -1) {
+              handleLogin(client);
+              break;
+            }
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println("Connection: close");
             client.println();
-            
+
             // turns the GPIOs on and off
             if (header.indexOf("GET /5/on") >= 0) {
               Serial.println("GPIO 5 on");
@@ -94,40 +129,40 @@ void loop(){
               output4State = "off";
               digitalWrite(output4, LOW);
             }
-            
+
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
+            // CSS to style the on/off buttons
             // Feel free to change the background-color and font-size attributes to fit your preferences
             client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
             client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
             client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
             client.println(".button2 {background-color: #77878A;}</style></head>");
-            
+
             // Web Page Heading
             client.println("<body><h1>Control LED with Web</h1>");
-            
-            // Display current state, and ON/OFF buttons for GPIO 5  
+
+            // Display current state, and ON/OFF buttons for GPIO 5
             client.println("<p>GPIO 5 - State " + output5State + "</p>");
-            // If the output5State is off, it displays the ON button       
-            if (output5State=="off") {
+            // If the output5State is off, it displays the ON button
+            if (output5State == "off") {
               client.println("<p><a href=\"/5/on\"><button class=\"button\">ON</button></a></p>");
             } else {
               client.println("<p><a href=\"/5/off\"><button class=\"button button2\">OFF</button></a></p>");
-            } 
-               
-            // Display current state, and ON/OFF buttons for GPIO 4  
+            }
+
+            // Display current state, and ON/OFF buttons for GPIO 4
             client.println("<p>GPIO 4 - State " + output4State + "</p>");
-            // If the output4State is off, it displays the ON button       
-            if (output4State=="off") {
+            // If the output4State is off, it displays the ON button
+            if (output4State == "off") {
               client.println("<p><a href=\"/4/on\"><button class=\"button\">ON</button></a></p>");
             } else {
               client.println("<p><a href=\"/4/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
             client.println("</body></html>");
-            
+
             // The HTTP response ends with another blank line
             client.println();
             // Break out of the while loop
