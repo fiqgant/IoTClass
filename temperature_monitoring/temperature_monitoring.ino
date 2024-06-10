@@ -1,8 +1,8 @@
 #include <ESP8266WiFi.h>
 
 String apiWritekey = "OVMMIDUQKLBZ0XUM"; 
-const char* ssid = "nipnip";
-const char* password = "pakeajadulu" ;
+const char* ssid = "n";
+const char* password = "12345677" ;
 
 const char* server = "api.thingspeak.com";
 float resolution=3.3/1023;
